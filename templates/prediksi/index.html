@@ -1,0 +1,273 @@
+﻿{% extends "base.html" %}
+{% load static humanize %}
+
+{% block content %}
+<!-- 1. BERANDA / HERO -->
+<section id="beranda" class="hero">
+    <div class="container hero-grid">
+        <div>
+            <div class="hero-eyebrow-row">
+                <span class="pill-dark-mono"><span class="dot-rose"></span> INDEKS KOS MADIUN</span>
+                <span class="mono-meta">{{ stats.total_sampel }} DATA LOKAL</span>
+            </div>
+
+            <h1>Temukan tarif kos yang <span class="serif-italic">masuk akal.</span></h1>
+
+            <p class="hero-desc">
+                Cek perkiraan sewa bulanan dari jarak ke kampus, rating penghuni, dan fasilitas kamar. Bandingkan hasil model dengan gambaran pasar sebelum menentukan pilihan.
+            </p>
+
+            <div class="hero-actions">
+                <a href="#kalkulator" class="btn-primary">Cek Harga Kos &rarr;</a>
+                <a href="#grafik" class="btn-outline">Jelajahi data</a>
+            </div>
+
+            <div class="hero-specs-footer">
+                <div>
+                    <span class="mono-label">METODE</span>
+                    <strong>Regresi Linear</strong>
+                </div>
+                <div>
+                    <span class="mono-label">CAKUPAN</span>
+                    <strong>Area kampus Madiun</strong>
+                </div>
+                <div>
+                    <span class="mono-label">EVALUATOR</span>
+                    <strong>Groq Llama 3.3</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="potret-card-wine">
+            <div class="potret-top">
+                <span class="mono-label light">POTRET TARIF BULANAN</span>
+                <span class="city-pill">MADIUN</span>
+            </div>
+
+            <div class="potret-main">
+                <small>Rata-rata dari {{ stats.total_sampel }} data kos</small>
+                <div class="potret-price">Rp {{ stats.rata_rata_pasar|intcomma }}</div>
+                <small>per kamar, setiap bulan</small>
+            </div>
+
+            <div class="potret-bottom-grid">
+                <div class="potret-subbox">
+                    <span class="mono-label light">MULAI DARI</span>
+                    <strong>Rp {{ stats.harga_min|intcomma }}</strong>
+                </div>
+                <div class="potret-subbox">
+                    <span class="mono-label light">HINGGA</span>
+                    <strong>Rp {{ stats.harga_max|intcomma }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container steps-grid">
+        <div class="step-card">
+            <span class="step-num mono-label">01 • SPESIFIKASI</span>
+            <h4>Masukkan Data Kamar</h4>
+            <p>Isi jarak tempuh ke kampus (km), rating kos (1.0–5.0), dan ketersediaan AC.</p>
+        </div>
+        <div class="step-card">
+            <span class="step-num mono-label">02 • REGRESI LINEAR</span>
+            <h4>Hitung Estimasi Tarif</h4>
+            <p>Model terlatih memprediksi tarif bulanan secara instan dari bobot parameter.</p>
+        </div>
+        <div class="step-card">
+            <span class="step-num mono-label">03 • GROQ AI</span>
+            <h4>Evaluasi Kewajaran</h4>
+            <p>AI menganalisis apakah estimasi kompetitif terhadap rata-rata pasar Madiun.</p>
+        </div>
+    </div>
+</section>
+
+<!-- 2. KALKULATOR & ULASAN GROQ AI -->
+<section id="kalkulator" class="section">
+    <div class="container">
+        <div class="section-header">
+            <span class="eyebrow-wine mono-label">SIMULASI TARIF</span>
+            <h2>Kalkulator Estimasi <span class="serif-italic">Sewa Kos</span></h2>
+            <p>Masukkan parameter kamar kos untuk melihat prediksi harga dan evaluasi kewajaran AI.</p>
+        </div>
+
+        <div class="calc-grid">
+            <div class="card">
+                <form method="POST" action="#kalkulator">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="jarak_km">Jarak ke Kampus (km)</label>
+                        <input type="number" step="0.1" min="0.1" max="15.0" id="jarak_km" name="jarak_km" value="{{ input_user.jarak_km }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rating">Rating Penghuni (1.0 – 5.0)</label>
+                        <input type="number" step="0.1" min="1.0" max="5.0" id="rating" name="rating" value="{{ input_user.rating }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ac">Fasilitas Pendingin</label>
+                        <select id="ac" name="ac">
+                            <option value="tidak" {% if input_user.ac == "tidak" %}selected{% endif %}>Non-AC</option>
+                            <option value="ya" {% if input_user.ac == "ya" %}selected{% endif %}>Dengan AC</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary full">Hitung Estimasi Tarif</button>
+                </form>
+            </div>
+
+            <div class="card result-panel">
+                {% if hasil_prediksi is not None %}
+                    <span class="eyebrow-wine mono-label">HASIL ESTIMASI MODEL</span>
+                    <div class="price-display">Rp {{ hasil_prediksi|intcomma }} <span>/ bulan</span></div>
+
+                    <div class="compare-pills">
+                        <div class="pill">
+                            <small class="mono-label">RATA-RATA PASAR</small>
+                            <strong>Rp {{ stats.rata_rata_pasar|intcomma }}</strong>
+                        </div>
+                        <div class="pill">
+                            <small class="mono-label">ACUAN {% if input_user.ac == "ya" %}BER-AC{% else %}NON-AC{% endif %}</small>
+                            <strong>Rp {% if input_user.ac == "ya" %}{{ stats.rata_ac|intcomma }}{% else %}{{ stats.rata_non_ac|intcomma }}{% endif %}</strong>
+                        </div>
+                    </div>
+
+                    <div class="ai-box">
+                        <div class="ai-header">
+                            <strong>Evaluasi Kewajaran Tarif</strong>
+                            <span class="ai-source mono-label">{{ ulasan_ai.sumber }}</span>
+                        </div>
+                        <p>{{ ulasan_ai.ulasan }}</p>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <h3>Siap Menghitung</h3>
+                        <p>Isi spesifikasi kamar di formulir sebelah kiri lalu tekan <strong>Hitung Estimasi Tarif</strong> untuk melihat prediksi harga bulanan dan ulasan analisis dari Groq AI.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 3. GRAFIK TARIF -->
+<section id="grafik" class="section section-alt">
+    <div class="container">
+        <div class="section-header">
+            <span class="eyebrow-wine mono-label">EKSPLORASI DATASET</span>
+            <h2>Visualisasi Data <span class="serif-italic">Tarif Kos</span></h2>
+            <p>Pengaruh fasilitas pendingin dan jarak kampus pada {{ stats.total_sampel }} sampel data.</p>
+        </div>
+
+        <div class="charts-grid">
+            <div class="card">
+                <h3>Perbandingan Rata-rata AC vs Non-AC</h3>
+                <canvas id="barAcChart"></canvas>
+                <div class="insight-note">
+                    Kamar <strong>Ber-AC</strong> memiliki rata-rata <strong>Rp {{ stats.rata_ac|intcomma }}</strong>, lebih tinggi <strong>Rp {{ stats.selisih_ac|intcomma }} (+{{ stats.persen_ac }}%)</strong> dibanding <strong>Non-AC</strong> (<strong>Rp {{ stats.rata_non_ac|intcomma }}</strong>).
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Sebaran Jarak Kampus vs Tarif Sewa</h3>
+                <canvas id="scatterJarakChart"></canvas>
+                <div class="insight-note">
+                    Semakin dekat jarak ke kampus dan tersedianya fasilitas AC cenderung menempatkan tarif pada klaster lebih tinggi. <em>Catatan: pola visual menunjukkan asosiasi data observasi, bukan bukti sebab-akibat tunggal.</em>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 4. INFO MODEL & ARSITEKTUR SISTEM -->
+<section id="info-model" class="section">
+    <div class="container">
+        <div class="card architecture-card">
+            <span class="eyebrow-wine mono-label">ARSITEKTUR SISTEM</span>
+            <h2>Linear Regression &amp; <span class="serif-italic">AI API</span></h2>
+            <p class="arch-desc">
+                Tarif dihitung oleh model <strong>Linear Regression</strong> berdasarkan jarak ke kampus, rating penghuni, dan fasilitas AC. Hasil numerik kemudian dievaluasi oleh <strong>Groq</strong> untuk menjelaskan kewajaran harga dalam Bahasa Indonesia.
+            </p>
+
+            <div class="metrics-grid">
+                <div class="sub-card">
+                    <span class="metric-label mono-label">MAE</span>
+                    <div class="metric-value">Rp {{ stats.mae|intcomma }}</div>
+                    <p>Rata-rata selisih prediksi terhadap data observasi.</p>
+                </div>
+
+                <div class="sub-card">
+                    <span class="metric-label mono-label">RMSE</span>
+                    <div class="metric-value">Rp {{ stats.rmse|intcomma }}</div>
+                    <p>Besarnya akar rata-rata kuadrat kesalahan prediksi.</p>
+                </div>
+
+                <div class="sub-card">
+                    <span class="metric-label mono-label">KOEFISIEN DETERMINASI</span>
+                    <div class="metric-value r2-highlight">{{ stats.r2 }} <span>/ 1,000</span></div>
+                    <p>Sekitar {{ stats.r2_persen }}% variasi tarif dapat dijelaskan model pada data ini.</p>
+                </div>
+            </div>
+
+            <div class="info-split-grid">
+                <div class="sub-card">
+                    <span class="metric-label mono-label">INPUT MODEL</span>
+                    <ul class="model-var-list">
+                        <li><strong>Jarak:</strong> jarak kamar ke kampus dalam kilometer.</li>
+                        <li><strong>Rating:</strong> penilaian penghuni dengan rentang 1.0–5.0.</li>
+                        <li><strong>AC:</strong> AC bernilai 1, sedangkan Non-AC bernilai 0.</li>
+                    </ul>
+                </div>
+
+                <div class="sub-card note-amber-wine">
+                    <span class="metric-label mono-label amber-text">CATATAN INTERPRETASI</span>
+                    <p>
+                        Metrik dihitung menggunakan seluruh <strong>{{ stats.total_sampel }} data observasi</strong>, sehingga lebih tepat sebagai gambaran kecocokan model pada dataset, bukan hasil evaluasi data yang benar-benar terpisah.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="dataset-observasi" class="card table-card" style="margin-top: 1.75rem;">
+            <h3>Dataset Observasi Kos Madiun ({{ stats.total_sampel }} Data)</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Jarak ke Kampus (km)</th>
+                            <th>Rating</th>
+                            <th>Fasilitas</th>
+                            <th>Tarif Bulanan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in stats.tabel_data %}
+                        <tr>
+                            <td>{{ row.no }}</td>
+                            <td>{{ row.jarak_km }} km</td>
+                            <td>{{ row.rating }}</td>
+                            <td>
+                                <span class="tag {% if row.fasilitas == 'Ber-AC' %}tag-ac{% else %}tag-non{% endif %}">
+                                    {{ row.fasilitas }}
+                                </span>
+                            </td>
+                            <td><strong>Rp {{ row.harga_rp|intcomma }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{ bar_values|json_script:"bar-values" }}
+{{ scatter_ac|json_script:"scatter-ac" }}
+{{ scatter_non_ac|json_script:"scatter-non-ac" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/chart_ac.js' %}"></script>
+{% endblock %}
